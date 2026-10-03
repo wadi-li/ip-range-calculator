@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Калькулятор диапазонов IP-адресов (классы A/B/C)</title>
+<script>
+  (function(){try{if(localStorage.getItem('ipcalc-theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+</script>
+<style>
+  :root{
+    /* Светлая тема — по умолчанию */
+    --bg1:#f5f7fb;
+    --bg2:#e9eef6;
+    --panel:#ffffff;
+    --panel2:#f3f6fb;
+    --border:#d6deea;
+    --accent:#0f8a7e;
+    --accent2:#1f6fbf;
+    --text:#1a2433;
+    --heading:#0d1726;
+    --muted:#5b6b82;
+    --ok:#2f855a;
+    --err:#c53030;
+    --err-bg:rgba(197,48,48,.07);
+    --err-text:#9b2c2c;
+    --warn:#a86b00;
+    --violet:#6b46c1;
+    --hover:rgba(15,23,42,.03);
+    --code-bg:rgba(15,23,42,.06);
+    --btn-text:#ffffff;
+    --shadow:0 2px 10px rgba(15,23,42,.06);
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    color-scheme: light;
+  }
+  [data-theme="dark"]{
+    --bg1:#0b1220;
+    --bg2:#0f1b30;
+    --panel:#16213a;
+    --panel2:#1c2b4a;
+    --border:#2a3a5c;
+    --accent:#4fd1c5;
+    --accent2:#63b3ed;
+    --text:#e2e8f0;
+    --heading:#ffffff;
+    --muted:#94a3b8;
+    --ok:#48bb78;
+    --err:#f56565;
+    --err-bg:rgba(245,101,101,.08);
+    --err-text:#feb2b2;
+    --warn:#ecc94b;
+    --violet:#b794f4;
+    --hover:rgba(255,255,255,.02);
+    --code-bg:rgba(255,255,255,.06);
+    --btn-text:#0b1220;
+    --shadow:0 4px 18px rgba(0,0,0,.25);
+    color-scheme: dark;
+  }
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+  .theme-btn{
+    padding:7px 12px;border-radius:8px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);cursor:pointer;font-size:.85rem;white-space:nowrap;
+  }
+  .theme-btn:hover{border-color:var(--accent2);}
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:linear-gradient(180deg,var(--bg1),var(--bg2));
+    min-height:100vh;
+    color:var(--text);
+    padding:24px;
+    line-height:1.5;
+  }
+  h1{
+    font-size:1.5rem;
+    margin:0 0 4px;
+    color:var(--heading);
+  }
+  .subtitle{
+    color:var(--muted);
+    margin:0 0 24px;
+    font-size:.95rem;
+  }
+  .wrap{
+    max-width:1100px;
+    margin:0 auto;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:20px 22px;
+    margin-bottom:22px;
+    box-shadow:var(--shadow);
+  }
+  .card h2{
+    margin:0 0 4px;
+    font-size:1.15rem;
+    color:var(--accent2);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .card p.hint{
+    color:var(--muted);
+    font-size:.85rem;
+    margin:2px 0 16px;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:.88rem;
+  }
+  th,td{
+    padding:8px 10px;
+    text-align:left;
+    border-bottom:1px solid var(--border);
+    white-space:normal;
+  }
+  td:nth-child(2), td:nth-child(3), td:nth-child(4){
+    white-space:nowrap;
+  }
+  th{
+    color:var(--muted);
+    font-weight:600;
+    text-transform:uppercase;
+    font-size:.72rem;
+    letter-spacing:.04em;
+  }
+  tr:hover td{ background:var(--hover); }
+  .badge{
+    display:inline-block;
+    padding:2px 9px;
+    border-radius:20px;
+    font-weight:700;
+    font-size:.8rem;
+  }
+  .badge.A{background:rgba(79,209,197,.15); color:var(--accent);}
+  .badge.B{background:rgba(99,179,237,.15); color:var(--accent2);}
+  .badge.C{background:rgba(236,201,75,.15); color:var(--warn);}
+  .badge.D{background:rgba(159,122,234,.15); color:var(--violet);}
+  .badge.E{background:rgba(245,101,101,.15); color:var(--err);}
+
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+  @media(max-width:760px){ .grid{ grid-template-columns:1fr; } }
+
+  label{
+    display:block;
+    font-size:.8rem;
+    color:var(--muted);
+    margin-bottom:5px;
+  }
+  input[type=text]{
+    width:100%;
+    padding:9px 11px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:var(--panel2);
+    color:var(--text);
+    font-size:.95rem;
+    font-family: 'Consolas','Courier New',monospace;
+  }
+  input[type=text]:focus{
+    outline:none;
+    border-color:var(--accent2);
+  }
+  .field{ margin-bottom:14px; }
+  .row-inline{
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+  .row-inline .field{ flex:1; margin-bottom:0; }
+  .sep{ color:var(--muted); padding-top:22px; font-weight:700; }
+
+  .toggle{
+    display:flex;
+    gap:6px;
+    margin-bottom:10px;
+  }
+  .toggle button{
+    flex:1;
+    padding:6px 10px;
+    border-radius:7px;
+    border:1px solid var(--border);
+    background:var(--panel2);
+    color:var(--muted);
+    cursor:pointer;
+    font-size:.78rem;
+  }
+  .toggle button.active{
+    background:rgba(99,179,237,.15);
+    color:var(--accent2);
+    border-color:var(--accent2);
+  }
+
+  button.calc{
+    margin-top:6px;
+    padding:11px 20px;
+    background:linear-gradient(135deg,var(--accent2),var(--accent));
+    border:none;
+    border-radius:9px;
+    color:var(--btn-text);
+    font-weight:700;
+    font-size:.95rem;
+    cursor:pointer;
+  }
+  button.calc:hover{ filter:brightness(1.08); }
+
+  .result{
+    margin-top:18px;
+    padding:14px 16px;
+    background:var(--panel2);
+    border:1px solid var(--border);
+    border-radius:10px;
+    font-size:.9rem;
+    display:none;
+  }
+  .result.show{ display:block; }
+  .result.error{
+    border-color:var(--err);
+    background:var(--err-bg);
+    color:var(--err-text);
+  }
+  .result-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+    gap:10px 18px;
+  }
+  .result-item .k{
+    color:var(--muted);
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    margin-bottom:2px;
+  }
+  .result-item .v{
+    font-family:'Consolas','Courier New',monospace;
+    font-size:.98rem;
+    font-weight:600;
+    color:var(--heading);
+    word-break:break-word;
+  }
+  .result-item .v.accent{ color:var(--accent); }
+  .divider{
+    height:1px;
+    background:var(--border);
+    margin:14px 0;
+  }
+  .cidr-list{
+    margin-top:10px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .cidr-chip{
+    background:rgba(79,209,197,.12);
+    border:1px solid rgba(79,209,197,.35);
+    color:var(--accent);
+    padding:5px 11px;
+    border-radius:7px;
+    font-family:'Consolas','Courier New',monospace;
+    font-size:.87rem;
+  }
+  .note{
+    font-size:.82rem;
+    color:var(--muted);
+    margin-top:10px;
+  }
+  footer{
+    text-align:center;
+    color:var(--muted);
+    font-size:.78rem;
+    margin-top:10px;
+    padding-bottom:20px;
+  }
+  code.mono{
+    font-family:'Consolas','Courier New',monospace;
+    background:var(--code-bg);
+    padding:1px 5px;
+    border-radius:5px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar"><div>
+  <h1>Калькулятор диапазонов IPv4-адресов</h1>
+  <p class="subtitle">Классы A / B / C / D / E, пересчёт «маска ⇄ диапазон» и разбивка произвольного диапазона на блоки CIDR</p>
+  </div><button class="theme-btn" id="themeBtn" onclick="toggleTheme()">Тёмная тема</button></div>
+
+  <!-- Справочная таблица классов -->
+  <div class="card">
+    <h2>Справочная таблица классов сетей</h2>
+    <p class="hint">Классическая (classful) схема адресации — сейчас используется только как ориентир, реальные сети строятся по CIDR / VLSM</p>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Класс</th>
+          <th>Диапазон 1-го октета</th>
+          <th>Диапазон адресов</th>
+          <th>Маска по умолчанию</th>
+          <th>CIDR</th>
+          <th>Кол-во сетей</th>
+          <th>Хостов в сети</th>
+          <th>Назначение</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge A">A</span></td>
+          <td>1 – 126</td>
+          <td>1.0.0.0 – 126.255.255.255</td>
+          <td>255.0.0.0</td>
+          <td>/8</td>
+          <td>126</td>
+          <td>16 777 214</td>
+          <td>Крупные сети</td>
+        </tr>
+        <tr>
+          <td><span class="badge B">B</span></td>
+          <td>128 – 191</td>
+          <td>128.0.0.0 – 191.255.255.255</td>
+          <td>255.255.0.0</td>
+          <td>/16</td>
+          <td>16 384</td>
+          <td>65 534</td>
+          <td>Сети среднего размера</td>
+        </tr>
+        <tr>
+          <td><span class="badge C">C</span></td>
+          <td>192 – 223</td>
+          <td>192.0.0.0 – 223.255.255.255</td>
+          <td>255.255.255.0</td>
+          <td>/24</td>
+          <td>2 097 152</td>
+          <td>254</td>
+          <td>Небольшие сети</td>
+        </tr>
+        <tr>
+          <td><span class="badge D">D</span></td>
+          <td>224 – 239</td>
+          <td>224.0.0.0 – 239.255.255.255</td>
+          <td>—</td>
+          <td>/4</td>
+          <td>—</td>
+          <td>—</td>
+          <td>Multicast</td>
+        </tr>
+        <tr>
+          <td><span class="badge E">E</span></td>
+          <td>240 – 255</td>
+          <td>240.0.0.0 – 255.255.255.255</td>
+          <td>—</td>
+          <td>/4</td>
+          <td>—</td>
+          <td>—</td>
+          <td>Зарезервировано (экспериментальное)</td>
+        </tr>
+        <tr>
+          <td>—</td>
+          <td>127</td>
+          <td>127.0.0.0 – 127.255.255.255</td>
+          <td>255.0.0.0</td>
+          <td>/8</td>
+          <td>—</td>
+          <td>—</td>
+          <td>Loopback (localhost)</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="note">
+      Приватные диапазоны (RFC 1918): <code class="mono">10.0.0.0/8</code>,
+      <code class="mono">172.16.0.0/12</code>, <code class="mono">192.168.0.0/16</code>
+    </p>
+  </div>
+
+  <!-- Калькулятор 1: IP + маска -> диапазон -->
+  <div class="card">
+    <h2>① IP-адрес + маска → диапазон</h2>
+    <p class="hint">Введите IP-адрес и маску (в виде <code class="mono">255.255.255.0</code> или CIDR <code class="mono">/24</code>) — калькулятор посчитает сеть, широковещательный адрес и диапазон хостов</p>
+
+    <div class="row-inline">
+      <div class="field">
+        <label for="ip1">IP-адрес</label>
+        <input type="text" id="ip1" placeholder="например, 192.168.10.55" value="192.168.10.55">
+      </div>
+      <div class="sep">/</div>
+      <div class="field">
+        <label for="mask1">Маска или CIDR</label>
+        <input type="text" id="mask1" placeholder="255.255.255.0 или 24" value="24">
+      </div>
+    </div>
+    <button class="calc" onclick="calcMaskToRange()">Рассчитать диапазон</button>
+
+    <div id="res1" class="result">
+      <div class="result-grid" id="res1grid"></div>
+    </div>
+  </div>
+
+  <!-- Калькулятор 2: диапазон -> маска/CIDR -->
+  <div class="card">
+    <h2>② Диапазон IP → маска / CIDR</h2>
+    <p class="hint">Введите начальный и конечный адрес диапазона. Если диапазон точно соответствует блоку CIDR — покажется одна маска. Если не соответствует — диапазон будет разбит на минимальный набор блоков CIDR, которые в сумме дают этот диапазон.</p>
+
+    <div class="row-inline">
+      <div class="field">
+        <label for="ipStart">Начальный IP</label>
+        <input type="text" id="ipStart" placeholder="например, 10.20.0.0" value="10.20.4.0">
+      </div>
+      <div class="sep">–</div>
+      <div class="field">
+        <label for="ipEnd">Конечный IP</label>
+        <input type="text" id="ipEnd" placeholder="например, 10.20.7.255" value="10.20.9.255">
+      </div>
+    </div>
+    <button class="calc" onclick="calcRangeToMask()">Рассчитать маску / CIDR</button>
+
+    <div id="res2" class="result">
+      <div id="res2body"></div>
+    </div>
+  </div>
+
+  <footer>Все вычисления выполняются локально в браузере, ничего не отправляется на сервер</footer>
+</div>
+
+<script>
+/* ---------- тема ---------- */
+function updateThemeBtn(){
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.getElementById('themeBtn').textContent = dark ? 'Светлая тема' : 'Тёмная тема';
+}
+function toggleTheme(){
+  const root = document.documentElement;
+  const dark = root.getAttribute('data-theme') === 'dark';
+  if(dark){ root.removeAttribute('data-theme'); } else { root.setAttribute('data-theme','dark'); }
+  try{ localStorage.setItem('ipcalc-theme', dark ? 'light' : 'dark'); }catch(e){}
+  updateThemeBtn();
+}
+
+/* ---------- базовые утилиты ---------- */
+
+function ipToInt(ip){
+  if(typeof ip !== 'string') return null;
+  const parts = ip.trim().split('.');
+  if(parts.length !== 4) return null;
+  let n = 0;
+  for(const p of parts){
+    if(!/^\d{1,3}$/.test(p)) return null;
+    const v = parseInt(p,10);
+    if(v < 0 || v > 255) return null;
+    n = (n << 8) | v;
+  }
+  return n >>> 0;
+}
+
+function intToIp(n){
+  n = n >>> 0;
+  return [ (n>>>24)&255, (n>>>16)&255, (n>>>8)&255, n&255 ].join('.');
+}
+
+function cidrToMaskInt(cidr){
+  cidr = parseInt(cidr,10);
+  if(isNaN(cidr) || cidr < 0 || cidr > 32) return null;
+  if(cidr === 0) return 0;
+  return (0xFFFFFFFF << (32-cidr)) >>> 0;
+}
+
+// проверяет, что маска — это непрерывная последовательность единиц затем нулей, возвращает cidr или null
+function maskIntToCidr(maskInt){
+  maskInt = maskInt >>> 0;
+  let cidr = 0;
+  let seenZero = false;
+  for(let i=31;i>=0;i--){
+    const bit = (maskInt >>> i) & 1;
+    if(bit === 1){
+      if(seenZero) return null; // единица после нуля -> невалидная маска
+      cidr++;
+    } else {
+      seenZero = true;
+    }
+  }
+  return cidr;
+}
+
+// парсит поле "маска" как /CIDR либо как dotted-decimal маску
+function parseMaskField(str){
+  str = str.trim();
+  if(str === '') return {error:'Пустое поле маски'};
+  if(str.startsWith('/')) str = str.slice(1);
+  if(/^\d{1,2}$/.test(str) && parseInt(str,10) <= 32){
+    const cidr = parseInt(str,10);
+    return {cidr, maskInt: cidrToMaskInt(cidr)};
+  }
+  // dotted decimal
+  const maskInt = ipToInt(str);
+  if(maskInt === null) return {error:'Не удалось распознать маску: '+str};
+  const cidr = maskIntToCidr(maskInt);
+  if(cidr === null) return {error:'Некорректная маска (биты не образуют непрерывный префикс): '+str};
+  return {cidr, maskInt};
+}
+
+function ipClass(firstOctet){
+  if(firstOctet === 0) return {label:'Специальный (0.x.x.x)', css:''};
+  if(firstOctet === 127) return {label:'Loopback', css:''};
+  if(firstOctet >=1 && firstOctet <=126) return {label:'A', css:'A'};
+  if(firstOctet >=128 && firstOctet <=191) return {label:'B', css:'B'};
+  if(firstOctet >=192 && firstOctet <=223) return {label:'C', css:'C'};
+  if(firstOctet >=224 && firstOctet <=239) return {label:'D (multicast)', css:'D'};
+  if(firstOctet >=240 && firstOctet <=255) return {label:'E (резерв)', css:'E'};
+  return {label:'—', css:''};
+}
+
+function intToBinaryDotted(n){
+  n = n >>> 0;
+  const bytes = [ (n>>>24)&255, (n>>>16)&255, (n>>>8)&255, n&255 ];
+  return bytes.map(b => b.toString(2).padStart(8,'0')).join('.');
+}
+
+function fmtInt(n){
+  return n.toLocaleString('ru-RU');
+}
+
+function showError(containerId, msg){
+  const el = document.getElementById(containerId);
+  el.classList.add('show','error');
+  el.innerHTML = '⚠ ' + msg;
+}
+
+/* ---------- Калькулятор 1: IP + маска -> диапазон ---------- */
+
+function calcMaskToRange(){
+  const res = document.getElementById('res1');
+  res.classList.remove('error');
+  const ipStr = document.getElementById('ip1').value;
+  const maskStr = document.getElementById('mask1').value;
+
+  const ipInt = ipToInt(ipStr);
+  if(ipInt === null){ showError('res1','Некорректный IP-адрес: "'+ipStr+'"'); return; }
+
+  const maskRes = parseMaskField(maskStr);
+  if(maskRes.error){ showError('res1', maskRes.error); return; }
+
+  const {cidr, maskInt} = maskRes;
+  const wildcardInt = (~maskInt) >>> 0;
+  const networkInt = (ipInt & maskInt) >>> 0;
+  const broadcastInt = (networkInt | wildcardInt) >>> 0;
+  const totalAddresses = Math.pow(2, 32-cidr);
+
+  let firstHost, lastHost, usableHosts;
+  if(cidr >= 31){
+    // /31, /32 — особые случаи (point-to-point, single host)
+    firstHost = intToIp(networkInt);
+    lastHost = intToIp(broadcastInt);
+    usableHosts = cidr === 32 ? 1 : 2;
+  } else {
+    firstHost = intToIp((networkInt+1) >>> 0);
+    lastHost = intToIp((broadcastInt-1) >>> 0);
+    usableHosts = totalAddresses - 2;
+  }
+
+  const cls = ipClass((ipInt >>> 24) & 255);
+
+  const items = [
+    ['Класс адреса', cls.label, true],
+    ['Введённый IP', intToIp(ipInt), false],
+    ['Маска (dotted)', intToIp(maskInt), false],
+    ['CIDR', '/'+cidr, false],
+    ['Wildcard-маска', intToIp(wildcardInt), false],
+    ['Адрес сети', intToIp(networkInt), true],
+    ['Широковещательный адрес', intToIp(broadcastInt), true],
+    ['Диапазон хостов', firstHost+' – '+lastHost, true],
+    ['Всего адресов в блоке', fmtInt(totalAddresses), false],
+    ['Доступно хостов', fmtInt(usableHosts), false],
+    ['Маска (binary)', intToBinaryDotted(maskInt), false],
+  ];
+
+  const grid = document.getElementById('res1grid');
+  grid.innerHTML = items.map(([k,v,acc]) =>
+    `<div class="result-item"><div class="k">${k}</div><div class="v${acc?' accent':''}">${v}</div></div>`
+  ).join('');
+
+  res.classList.remove('error');
+  res.classList.add('show');
+}
+
+/* ---------- Калькулятор 2: диапазон -> маска/CIDR ---------- */
+
+function rangeToCidrList(startInt, endInt){
+  const cidrs = [];
+  let start = startInt >>> 0;
+  const end = endInt >>> 0;
+  while (start <= end) {
+    let maxSize = 32;
+    while (maxSize > 0) {
+      const mask = cidrToMaskInt(maxSize-1);
+      if ((start & mask) >>> 0 !== start) break;
+      maxSize--;
+    }
+    const diff = end - start + 1;
+    const maxDiff = 32 - Math.floor(Math.log2(diff));
+    if (maxSize < maxDiff) maxSize = maxDiff;
+    cidrs.push({ base: start, cidr: maxSize });
+    const blockSize = Math.pow(2, 32-maxSize);
+    start = start + blockSize;
+    if(blockSize === 0) break; // защита от бесконечного цикла
+  }
+  return cidrs;
+}
+
+function calcRangeToMask(){
+  const res = document.getElementById('res2');
+  res.classList.remove('error');
+  const startStr = document.getElementById('ipStart').value;
+  const endStr = document.getElementById('ipEnd').value;
+
+  const startInt = ipToInt(startStr);
+  const endInt = ipToInt(endStr);
+
+  if(startInt === null){ showError('res2', 'Некорректный начальный IP: "'+startStr+'"'); return; }
+  if(endInt === null){ showError('res2', 'Некорректный конечный IP: "'+endStr+'"'); return; }
+  if(startInt > endInt){ showError('res2', 'Начальный адрес больше конечного — проверьте порядок ввода'); return; }
+
+  const totalAddresses = (endInt - startInt + 1);
+  const cidrBlocks = rangeToCidrList(startInt, endInt);
+
+  let html = '';
+
+  html += `<div class="result-grid">
+      <div class="result-item"><div class="k">Начальный адрес</div><div class="v">${intToIp(startInt)}</div></div>
+      <div class="result-item"><div class="k">Конечный адрес</div><div class="v">${intToIp(endInt)}</div></div>
+      <div class="result-item"><div class="k">Всего адресов в диапазоне</div><div class="v accent">${fmtInt(totalAddresses)}</div></div>
+    </div>`;
+
+  html += '<div class="divider"></div>';
+
+  if(cidrBlocks.length === 1){
+    const b = cidrBlocks[0];
+    const maskInt = cidrToMaskInt(b.cidr);
+    const netInt = b.base;
+    const bcastInt = (netInt | (~maskInt >>> 0)) >>> 0;
+    const exact = (netInt === startInt) && (bcastInt === endInt);
+    html += `<p class="note" style="color:var(--ok);font-weight:600;">✓ Диапазон точно соответствует одному блоку CIDR</p>`;
+    html += `<div class="result-grid">
+        <div class="result-item"><div class="k">Сеть / CIDR</div><div class="v accent">${intToIp(netInt)}/${b.cidr}</div></div>
+        <div class="result-item"><div class="k">Маска</div><div class="v">${intToIp(maskInt)}</div></div>
+        <div class="result-item"><div class="k">Wildcard-маска</div><div class="v">${intToIp(~maskInt >>> 0)}</div></div>
+      </div>`;
+  } else {
+    html += `<p class="note" style="color:var(--warn);font-weight:600;">⚠ Диапазон не укладывается в один блок CIDR — минимальный набор покрывающих блоков (route aggregation):</p>`;
+    html += '<div class="cidr-list">' + cidrBlocks.map(b =>
+      `<span class="cidr-chip">${intToIp(b.base)}/${b.cidr}</span>`
+    ).join('') + '</div>';
+    html += `<p class="note">Всего блоков: ${cidrBlocks.length}. Если нужна одна общая (более широкая) маска, охватывающая весь диапазон, включая адреса за его пределами — см. ниже.</p>`;
+
+    // найти наименьший CIDR, полностью содержащий диапазон (supernet), даже если не точное совпадение
+    let cidr = 32;
+    while(cidr >= 0){
+      const maskInt = cidrToMaskInt(cidr);
+      const netInt = (startInt & maskInt) >>> 0;
+      const bcastInt = (netInt | (~maskInt >>> 0)) >>> 0;
+      if(netInt <= startInt && bcastInt >= endInt) break;
+      cidr--;
+    }
+    const maskInt = cidrToMaskInt(cidr);
+    const netInt = (startInt & maskInt) >>> 0;
+    const bcastInt = (netInt | (~maskInt >>> 0)) >>> 0;
+    html += `<div class="divider"></div>
+      <div class="result-grid">
+        <div class="result-item"><div class="k">Наименьший общий блок (supernet)</div><div class="v">${intToIp(netInt)}/${cidr}</div></div>
+        <div class="result-item"><div class="k">Маска supernet</div><div class="v">${intToIp(maskInt)}</div></div>
+        <div class="result-item"><div class="k">Диапазон supernet</div><div class="v">${intToIp(netInt)} – ${intToIp(bcastInt)}</div></div>
+      </div>
+      <p class="note">Внимание: supernet шире исходного диапазона и включает дополнительные адреса (${intToIp(netInt)} – ${intToIp((startInt-1)>>>0)}${startInt>0?' и ':''}${bcastInt>endInt? intToIp((endInt+1)>>>0)+' – '+intToIp(bcastInt):''}), не входящие в заданный диапазон.</p>`;
+  }
+
+  document.getElementById('res2body').innerHTML = html;
+  res.classList.remove('error');
+  res.classList.add('show');
+}
+
+/* ---------- запуск примеров при загрузке ---------- */
+window.addEventListener('DOMContentLoaded', () => {
+  updateThemeBtn();
+  calcMaskToRange();
+  calcRangeToMask();
+});
+</script>
+</body>
+</html>
