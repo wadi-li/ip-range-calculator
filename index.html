@@ -221,6 +221,22 @@
     display:none;
   }
   .result.show{ display:block; }
+  .result-toolbar{ display:flex; justify-content:flex-end; margin:-4px 0 10px; }
+  .result.error .result-toolbar{ display:none; }
+  .copy-btn{
+    padding:5px 12px; border-radius:7px; border:1px solid var(--border);
+    background:var(--panel); color:var(--accent2); cursor:pointer; font-size:.8rem; font-weight:600;
+  }
+  .copy-btn:hover{ border-color:var(--accent2); }
+  .copy-btn.done{ color:var(--ok); border-color:var(--ok); }
+  .result-item .v, .cidr-chip{ cursor:copy; }
+  .result-item .v:hover, .cidr-chip:hover{ text-decoration:underline dotted; }
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+    background:var(--heading); color:var(--panel); padding:8px 16px; border-radius:8px;
+    font-size:.85rem; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:10;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
   .result.error{
     border-color:var(--err);
     background:var(--err-bg);
@@ -400,6 +416,8 @@
     <button class="calc" onclick="calcMaskToRange()">Рассчитать диапазон</button>
 
     <div id="res1" class="result">
+      <div class="result-toolbar"><button type="button" class="copy-btn" onclick="copyResults('res1', this)" title="Скопировать все результаты как текст">Копировать результаты</button></div>
+      <div class="err-msg" id="res1err"></div>
       <div class="result-grid" id="res1grid"></div>
     </div>
   </div>
@@ -423,10 +441,13 @@
     <button class="calc" onclick="calcRangeToMask()">Рассчитать маску / CIDR</button>
 
     <div id="res2" class="result">
+      <div class="result-toolbar"><button type="button" class="copy-btn" onclick="copyResults('res2', this)" title="Скопировать все результаты как текст">Копировать результаты</button></div>
+      <div class="err-msg" id="res2err"></div>
       <div id="res2body"></div>
     </div>
   </div>
 
+  <div class="toast" id="toast"></div>
   <footer>Все вычисления выполняются локально в браузере, ничего не отправляется на сервер</footer>
 </div>
 
@@ -443,6 +464,59 @@ function toggleTheme(){
   try{ localStorage.setItem('ipcalc-theme', dark ? 'light' : 'dark'); }catch(e){}
   updateThemeBtn();
 }
+
+/* ---------- копирование ---------- */
+function copyText(text){
+  if(navigator.clipboard && window.isSecureContext){
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy') ? resolve() : reject(); }catch(e){ reject(e); }
+    document.body.removeChild(ta);
+  });
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(showToast._t); showToast._t = setTimeout(() => t.classList.remove('show'), 1500);
+}
+// собирает результаты блока в простой текст: «Параметр: значение», заметки, список CIDR
+function resultsToText(containerId){
+  const body = document.getElementById(containerId === 'res1' ? 'res1grid' : 'res2body');
+  const title = containerId === 'res1' ? 'IP + маска → диапазон' : 'Диапазон IP → маска / CIDR';
+  const lines = [title, ''];
+  body.querySelectorAll('.result-item, .note, .cidr-list, .divider').forEach(el => {
+    if(el.classList.contains('result-item')){
+      const k = el.querySelector('.k').textContent.trim();
+      const v = el.querySelector('.v').textContent.trim();
+      lines.push(k + ': ' + v);
+    } else if(el.classList.contains('cidr-list')){
+      el.querySelectorAll('.cidr-chip').forEach(c => lines.push('  ' + c.textContent.trim()));
+    } else if(el.classList.contains('divider')){
+      lines.push('');
+    } else {
+      lines.push(el.textContent.trim());
+    }
+  });
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function copyResults(containerId, btn){
+  copyText(resultsToText(containerId)).then(() => {
+    const old = 'Копировать результаты';
+    btn.textContent = 'Скопировано ✓'; btn.classList.add('done');
+    setTimeout(() => { btn.textContent = old; btn.classList.remove('done'); }, 1500);
+  }).catch(() => showToast('Не удалось скопировать'));
+}
+// клик по отдельному значению или CIDR-блоку — копирует только его
+document.addEventListener('click', e => {
+  const el = e.target.closest('.result-item .v, .cidr-chip');
+  if(!el) return;
+  const val = el.textContent.trim();
+  copyText(val).then(() => showToast('Скопировано: ' + val)).catch(() => showToast('Не удалось скопировать'));
+});
 
 /* ---------- базовые утилиты ---------- */
 
@@ -530,7 +604,9 @@ function fmtInt(n){
 function showError(containerId, msg){
   const el = document.getElementById(containerId);
   el.classList.add('show','error');
-  el.innerHTML = '⚠ ' + msg;
+  document.getElementById(containerId+'err').textContent = '⚠ ' + msg;
+  const body = document.getElementById(containerId === 'res1' ? 'res1grid' : 'res2body');
+  if(body) body.innerHTML = '';
 }
 
 /* ---------- Калькулятор 1: IP + маска -> диапазон ---------- */
@@ -586,6 +662,7 @@ function calcMaskToRange(){
     `<div class="result-item"><div class="k">${k}</div><div class="v${acc?' accent':''}">${v}</div></div>`
   ).join('');
 
+  document.getElementById('res1err').textContent = '';
   res.classList.remove('error');
   res.classList.add('show');
 }
@@ -681,6 +758,7 @@ function calcRangeToMask(){
   }
 
   document.getElementById('res2body').innerHTML = html;
+  document.getElementById('res2err').textContent = '';
   res.classList.remove('error');
   res.classList.add('show');
 }
